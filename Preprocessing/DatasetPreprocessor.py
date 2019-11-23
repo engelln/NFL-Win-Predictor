@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-
+import numpy as np
 
 game_data_dir = "D:\\Data\\NFL\\game\\"
 pbp_data_dir = "D:\\Data\\NFL\\pbp\\"
@@ -8,6 +8,7 @@ output_dir = "D:\\Data\\NFL\\output\\"
 
 
 def combine_data_in_dir(path):
+    print("Combining files in " + path)
     combined = pd.DataFrame()
     for file in os.listdir(path):
         combined = pd.concat([combined, pd.read_csv(path + file, low_memory=False)])
@@ -15,6 +16,7 @@ def combine_data_in_dir(path):
 
 
 def create_standings_data():
+    print("Creating standings data")
     standings_data = []
     teams = set()
 
@@ -47,6 +49,7 @@ def create_standings_data():
 def combine_standings_games():
     standings_data = create_standings_data()
     games_data = combine_data_in_dir(game_data_dir)
+    print("Combining standings and games")
 
     ht_win = []
     ht_loss = []
@@ -78,7 +81,38 @@ def combine_standings_games():
 
     return games_data
 
-combine_standings_games().to_csv(output_dir+"standingsgames.csv", index=False)
+
+def combine_pbp_standings_games():
+    pbp = combine_data_in_dir(pbp_data_dir)
+    pbp = pbp[["game_id", "home_team", "away_team", "total_home_score",
+                                         "total_away_score", "home_timeouts_remaining", "away_timeouts_remaining",
+                                         "posteam", "defteam", "posteam_score", "defteam_score",
+                                         "posteam_timeouts_remaining", "defteam_timeouts_remaining", "qtr",
+                                         "quarter_seconds_remaining", "down", "ydstogo", "yardline_100"]]
+    standings = combine_standings_games().drop(columns=["type", "state_of_game", "game_url", "home_team", "away_team"])
+    print("Combining pbp and games")
+
+    # need to add:
+    # season, week, htwin, htloss, httie, atwin, atloss, attie, label
+
+    return pd.merge(pbp, standings, on="game_id")
+
+
+def create_final_dataset():
+    data = combine_pbp_standings_games()
+    print("Creating final dataset")
+    data.dropna(inplace=True)
+    data["label"] = 2
+    data.loc[data["home_score"] > data["away_score"], "label"] = 0
+    data.loc[data["home_score"] < data["away_score"], "label"] = 1
+    data.drop(columns=["home_score", "away_score", "game_id"], inplace=True)
+    data.replace("JAC", "JAX", inplace=True)
+    data.replace("STL", "LA", inplace=True)
+    data.replace("SD", "LAC", inplace=True)
+    data.to_csv(output_dir+"FinalDataset.csv", index=False)
+
+
+create_final_dataset()
 
 
 
